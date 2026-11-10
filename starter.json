@@ -1,0 +1,22 @@
+{
+  "name": "Maze Munch",
+  "genre": "arcade",
+  "dim": "2D",
+  "mode": "Versus",
+  "players": "2–8",
+  "hook": "One neon maze, everyone munching. Glow, then chomp.",
+  "how": "Munch dots for points while the spooks hunt you. Eat a glowing orb and for a few seconds you can chomp other players and spooks; in the last 20 seconds a chomp knocks you out. Most points at the buzzer wins.",
+  "controls": "Arrow keys or WASD to move; swipe or the on-screen pad on touch",
+  "uses": [
+    ["Leaderboard", "Each player's best round score, shown on the results card."],
+    ["Host-run rules", "The host's browser keeps the dots and orbs and decides who chomped whom; if it leaves, the next player takes over."],
+    ["Host-run rounds", "Rounds, the clock and the final 20 seconds are timestamps in shared state, so a new host carries on."],
+    ["Bots", "Bot chompers fill the maze until enough people join, and spooks roam it."],
+    ["Live sync", "Every chomper moves itself and everyone sees it at once."]
+  ],
+  "ideas": [
+    "Add a cherry that gives 500 points and appears every 20 seconds",
+    "Make the maze bigger, with a second tunnel",
+    "Make it teams: red chompers against blue"
+  ]
+}
