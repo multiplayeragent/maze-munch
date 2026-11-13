@@ -32,6 +32,7 @@
   .card ol { text-align: left; margin: 0 0 8px; padding-left: 26px; font-size: 14px; }
   .card li span { float: right; font-variant-numeric: tabular-nums; } .card li.me { color: #fff36b; font-weight: 800; }
   .card li i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+  .card li.note { list-style: none; margin-left: -26px; opacity: .8; } /* a message in place of the list: no "1." in front */
   button.go { width: 100%; min-height: 48px; margin-top: 8px; border: 0; border-radius: 12px; background: #fff36b; color: #231a00; font: 800 17px system-ui, sans-serif; cursor: pointer; }
   button.go.wait { background: #3a3566; color: #d8d4ff; }
   #pad { position: fixed; width: 192px; height: 192px; touch-action: none; }
@@ -59,7 +60,7 @@
     <h3>This round</h3>
     <ol id="standings"></ol>
     <h3>Best rounds, all time</h3>
-    <ol id="board"><li>Loading the leaderboard…</li></ol>
+    <ol id="board"><li class="note">Loading the leaderboard…</li></ol>
     <button class="go" id="again">Play again</button>
     <p id="overNext" style="margin:8px 0 0"></p>
   </div>
@@ -745,8 +746,15 @@ let W = 0, H = 0, DPR = 1, TS = 20, OX = 0, OY = 0, mazeKey = "", shake = 0, cam
 function fit() {
   DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = W * DPR; cv.height = H * DPR;
   const upright = touchUI && H > W, short = !ATTRACT && W > H && H < 500;
-  const top = ATTRACT || short ? 6 : W < 640 ? 100 : 62, bottom = ATTRACT || short ? 6 : upright ? 230 : 32;
-  TS = ATTRACT ? W / (MW + 0.6) : Math.max(6, Math.min((W - 12) / MW, (H - top - bottom) / MH)); // the preview fills the width and pans
+  let top = ATTRACT || short ? 6 : W < 640 ? 100 : 62, bottom = ATTRACT || short ? 6 : upright ? 230 : 32;
+  const tile = () => Math.max(6, Math.min((W - 12) / MW, (H - top - bottom) / MH));
+  TS = ATTRACT ? W / (MW + 0.6) : tile(); // the preview fills the width and pans
+  if (!ATTRACT && !short) { // a narrow window has no room beside the maze: it starts below the standings and leaves room for the hint
+    const side = (W - MW * TS) / 2;
+    if (side < 170 && W >= 640) top = 126;
+    if (side < 150 && !upright) bottom = W < 640 ? 100 : 80;
+    TS = tile();
+  }
   OX = Math.round((W - MW * TS) / 2); OY = Math.round(upright ? top : top + (H - top - bottom - MH * TS) / 2);
   document.body.classList.toggle("short", short);
   // the how-to-play hint: in the left margin when there is room, else just under the maze
@@ -963,7 +971,9 @@ function hud(now) {
   if (g.ph === "ready") { if (left !== lastCount && left <= 3) { lastCount = left; banner(String(left || "GO!"), "", 900); sfx("go"); } }
   else if (lastCount > 0 && g.ph === "play") { lastCount = 0; banner("GO!", "", 700); sfx("go"); }
   if (final && finalFor !== g.id) { finalFor = g.id; banner(`Final ${Math.round(CONFIG.finalMs / 1000)} seconds!`, "One chomp and you're out", 2400); sfx("final"); }
-  const rows = chompers().sort((a, b) => (g.sc[b.id] || 0) - (g.sc[a.id] || 0)).slice(0, innerWidth < 640 || innerHeight < 500 ? 4 : 6);
+  const ranked = chompers().sort((a, b) => (g.sc[b.id] || 0) - (g.sc[a.id] || 0)), max = innerWidth < 640 || innerHeight < 500 ? 4 : 6;
+  const rows = ranked.slice(0, max), mine = ranked.findIndex((c) => c.mine);
+  if (mine >= max) rows[max - 1] = ranked[mine]; // my own row always shows, even when I am not near the top
   $("top").innerHTML = rows.map((c) => `<div class="${c.mine ? "me" : ""} ${c.out ? "out" : ""}"><i style="background:${c.color}"></i><span>${esc(c.mine ? "You" : c.name)}</span><b>${g.sc[c.id] || 0}</b></div>`).join("");
   if (now > msgUntil) $("msg").style.opacity = 0;
   if (!startedAt) startedAt = now;
@@ -990,12 +1000,12 @@ function showOver(g, t) {
 }
 function showBoard(score, played) {
   const list = $("board");
-  if (!board) { list.innerHTML = "<li>Leaderboards need a connection.</li>"; return; }
-  list.innerHTML = "<li>Loading the leaderboard…</li>";
+  if (!board) { list.innerHTML = '<li class="note">Leaderboards need a connection.</li>'; return; }
+  list.innerHTML = '<li class="note">Loading the leaderboard…</li>';
   const sent = played && score > 0 ? board.submit(score).catch(() => null) : Promise.resolve();
   sent.then(() => board.top(10)).then(({ entries }) => {
-    list.innerHTML = entries.length ? entries.map((e) => `<li>${esc(e.username || "Player")}<span>${e.score}</span></li>`).join("") : "<li>No scores yet. Set the first.</li>";
-  }).catch(() => { list.innerHTML = "<li>Couldn't load the leaderboard.</li>"; });
+    list.innerHTML = entries.length ? entries.map((e) => `<li>${esc(e.username || "Player")}<span>${e.score}</span></li>`).join("") : '<li class="note">No scores yet. Set the first.</li>';
+  }).catch(() => { list.innerHTML = "<li class='note'>Couldn't load the leaderboard.</li>"; });
 }
 $("again").onclick = () => { unlockAudio(); if (host.acting) applyAgain(net.sessionId); else net.send("again", {}); };
 
@@ -1022,7 +1032,7 @@ const KEYS = { arrowright: 0, d: 0, arrowdown: 1, s: 1, arrowleft: 2, a: 2, arro
 addEventListener("keydown", (e) => {
   unlockAudio();
   const d = KEYS[e.key.toLowerCase()];
-  if (d === undefined) return;
+  if (d === undefined || e.ctrlKey || e.metaKey || e.altKey) return; // leave browser shortcuts (Ctrl+S, Ctrl+D) alone
   e.preventDefault(); steer(d);
 });
 // Swipe anywhere: every 18px of drag in a new direction is a turn.
